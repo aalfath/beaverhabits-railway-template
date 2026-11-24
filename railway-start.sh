@@ -47,5 +47,5 @@ exec $RUN_AS gunicorn beaverhabits.main:app \
   --bind "0.0.0.0:${PORT:-8080}" \
   -w 1 -k uvicorn_worker.UvicornWorker \
   --forwarded-allow-ips '*' \
-  --max-requests 10000 --timeout 120 --graceful-timeout 10 \
+  --max-requests 10000 --timeout 120 --graceful-timeout 10 --no-control-socket \
   --log-level info
