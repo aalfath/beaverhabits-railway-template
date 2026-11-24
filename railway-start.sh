@@ -42,10 +42,21 @@ fi
 $RUN_AS python /app/bootstrap_admin.py || fail "admin bootstrap failed; not starting with open sign-up."
 
 # --- Server -----------------------------------------------------------------
-# One worker (NiceGUI's socket.io needs it); a worker crash makes gunicorn exit non-zero.
-exec $RUN_AS gunicorn beaverhabits.main:app \
+# One worker (NiceGUI's socket.io needs it). gunicorn exits 0 on SIGINT/SIGQUIT and when it
+# gives up, which Railway's ON_FAILURE policy treats as a clean stop. So any exit that Railway
+# didn't ask for (SIGTERM on redeploy/stop) is turned into a non-zero code and restarts the service.
+stopping=0
+trap 'stopping=1; kill -TERM "$pid" 2>/dev/null' TERM
+$RUN_AS gunicorn beaverhabits.main:app \
   --bind "0.0.0.0:${PORT:-8080}" \
   -w 1 -k uvicorn_worker.UvicornWorker \
   --forwarded-allow-ips '*' \
   --max-requests 10000 --timeout 120 --graceful-timeout 10 --no-control-socket \
-  --log-level info
+  --log-level info &
+pid=$!
+rc=0
+while :; do wait "$pid"; rc=$?; kill -0 "$pid" 2>/dev/null || break; done
+[ "$stopping" = "1" ] && exit 0
+echo "railway-start: gunicorn exited unexpectedly (code $rc); exiting non-zero so Railway restarts it." >&2
+[ "$rc" -eq 0 ] && rc=1
+exit "$rc"
