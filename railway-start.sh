@@ -55,6 +55,7 @@ $RUN_AS gunicorn beaverhabits.main:app \
   --log-level info &
 pid=$!
 rc=0
+set +e
 while :; do wait "$pid"; rc=$?; kill -0 "$pid" 2>/dev/null || break; done
 [ "$stopping" = "1" ] && exit 0
 echo "railway-start: gunicorn exited unexpectedly (code $rc); exiting non-zero so Railway restarts it." >&2
